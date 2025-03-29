@@ -1,14 +1,27 @@
 import karax/[karax, karaxdsl, vdom, jstrutils, kajax, jjson]
 include json
 
+# Константа для статуса ошибки
+const NotFoundStatus = 404
+# Глобальная константа для успешного статуса
+const SuccessStatus = 200
+
 # Информация об игре
 type GameInfo* = object
-    id*: int
-    name*: string
+    # Уникальный идентификатор игры
+    id*: int          
+    # Название игры
+    name*: string     
+    # Описание игры
     description*: string
-
+    # URL изображения игры
+    imageUrl*: string 
+    
+# Состояние приложения
 type AppState = object
+  # Список игр
   games: seq[GameInfo]
+  # Флаг загрузки
   isLoading: bool
 
 var appState = AppState(
@@ -21,14 +34,15 @@ proc fetchGames(onData:proc(res:seq[GameInfo])) =
   ajaxGet("/game", @[], proc(status: int, response: cstring) =
     let data = parseJson($response)
     var games :seq[GameInfo] = @[]
-    for gameJson in data:
-      games.add(GameInfo(
-        name: gameJson["name"].getStr(),
-        description: gameJson["description"].getStr(),
-        #imageUrl: gameJson["imageUrl"].getStr()
-      ))
     
-    onData(games)    
+    for gameJson in data:                        
+        games.add(GameInfo(
+          name: gameJson["name"].getStr(),
+          description: gameJson["description"].getStr(),
+          imageUrl: gameJson["imageUrl"].getStr()
+        ))
+    
+    onData(games)
   )  
 
 # Инициализирует состояние
@@ -44,9 +58,9 @@ proc createDom(): VNode =
   # Отрисовывает карточку игры
   proc renderGameItem(game: GameInfo): VNode =
     result = buildHtml(tdiv(class = "game-item")):
-      #timg(src = game.imageUrl, alt = game.title)
+      img(src = game.imageUrl, alt = game.name)
       tdiv(class = "game-title"): text game.name
-      tdiv(class = "game-description"): text game.description
+      tdiv(class = "game-description"): text game.description      
 
   result = buildHtml(tdiv(class="content")):
     tdiv(class = "game-list"):

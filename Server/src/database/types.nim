@@ -1,7 +1,10 @@
 # Информация об игре
 type GameInfo* = object
+    # Уникальный идентификатор игры
     id*: int
-    name*: string
+    # Название игры
+    name*: string 
+    # Описание игры
     description*: string
 
 # Интерфейс базы данных

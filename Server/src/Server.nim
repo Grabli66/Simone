@@ -2,9 +2,13 @@ import os
 import mummy, mummy/routers
 import std/marshal
 import std/mimetypes
+import std/strformat
 
 import database/database
 import database/types
+
+const staticPath = "static"
+const titleImage = "title.png"
 
 const mimeTypesDb : MimeDB = newMimetypes()
 
@@ -36,13 +40,32 @@ proc staticHandler(request: Request) =
 
 # Возвращает список игр
 proc getGameList(request: Request) {.gcsafe.}  =
-  let dbConn = database.get()
+  type GameInfoDto = object
+    id*: int
+    name*: string
+    description*: string
+    imageUrl*: string    
 
+  let dbConn = database.get()
   let games = dbConn.getGameInfoList()
     
+  var gameDtos: seq[GameInfoDto] = @[]
+  for game in games:
+    var titleImagePath = fmt"games/game_{game.id}/{titleImage}"
+    var imageUrl = fmt"/game/{staticPath}/{game.id}/{titleImage}"
+    if not fileExists(titleImagePath):    
+      imageUrl = "/static/unknownTitle.png"
+
+    gameDtos.add(GameInfoDto(
+      id: game.id,
+      name: game.name,
+      description: game.description,      
+      imageUrl: imageUrl
+    ))
+
   var headers: HttpHeaders
   headers["Content-Type"] = "application/json"
-  request.respond(200, headers, $$games)
+  request.respond(200, headers, $$gameDtos)
 
 # Устанавливает игру
 proc installGame(request: Request) =
@@ -69,12 +92,31 @@ proc installGame(request: Request) =
 proc startGame(request: Request) =
   discard
 
+# Возвращает статический файл для конкретной игры
+proc getGameFile(request: Request) =
+  let gameId = request.pathParams["id"]
+  let fileName = request.pathParams["name"]
+  let filePath = fmt"games/game_{gameId}/{fileName}"
+  
+  if not fileExists(filePath):
+    request.respond(404)
+    return
+
+  let ext = splitFile(filePath).ext
+  let mime = mimeTypesDb.getMimeType(ext)
+
+  var headers: HttpHeaders
+  headers["Content-Type"] = mime
+  let file = readFile(filePath)
+  request.respond(200, headers, file)
+
 var router: Router
 router.get("/", indexHandler)
-router.get("/static/@name", staticHandler)
+router.get(fmt"/{staticPath}/@name", staticHandler)
 router.get("/game", getGameList)
 router.get("/game/start/@id", startGame)
 router.post("/game/install", installGame)
+router.get(fmt"/game/{staticPath}/@id/@name", getGameFile)
 
 # Останавливает игру
 # Обработчик статических ресурсов
